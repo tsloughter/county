@@ -1,0 +1,13 @@
+{application, county,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel
+                  ,stdlib
+                  ,sheriff
+                 ]},
+  {mod, { county_app, []}},
+  {env, []}
+ ]}.

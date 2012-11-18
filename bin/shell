@@ -1,0 +1,12 @@
+#!/bin/bash
+
+UNAME=`uname`
+if [[ $UNAME = "Darwin" ]]; then
+  HOSTNAME=`hostname`
+else
+  HOSTNAME=`hostname --fqdn`
+fi
+
+export HOME=`pwd`
+
+erl +K true +A30 -pa ebin -env ERL_LIBS deps -name county@$HOSTNAME -s county_app

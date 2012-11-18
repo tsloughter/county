@@ -9,6 +9,6 @@ $ make
 
 ## Shell
 
-```
+```shell
 $ bin/shell
 ```

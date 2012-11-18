@@ -9,4 +9,4 @@ fi
 
 export HOME=`pwd`
 
-erl +K true +A30 -pa ebin -env ERL_LIBS deps -name county@$HOSTNAME -s county_app
+erl -pa ebin -env ERL_LIBS deps -name county@$HOSTNAME -s county_app

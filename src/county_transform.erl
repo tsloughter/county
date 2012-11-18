@@ -37,7 +37,6 @@
                   arity}).
 
 -record(pass1, {exports = [],
-                record_types,
                 generated = false,
                 records = []}).
 
@@ -79,9 +78,6 @@ do_transform(Forms, _Options) ->
                 Exports0 = Acc#pass1.exports,
                 NewExports = Exports0 ++ [element(1, RecDef)],
                 {Form, false, Acc#pass1{records = [RecDef|Recs0], exports = NewExports}};
-           (attribute, {attribute, _L, type, {_, RecTypeDef, _}}=Form, _Ctxt, Acc) ->
-
-                {Form, false, Acc#pass1{record_types=RecTypeDef}};
            (_Type, Form, _Context, Acc) ->
                 {Form, false, Acc}
         end,
@@ -106,12 +102,14 @@ do_transform(Forms, _Options) ->
                                           generated = false} = Acc) ->
                 %% Layout record funs before first function
                 L = element(2, Form),
-                Funs = generate_accessors(L, Acc, Acc#pass1.record_types),
+                Funs = generate_accessors(L, Acc),
                 {Funs, Form, [], false, Acc#pass1{generated = true}};
            (_Type, Form, _Ctxt, Acc) ->
                 {Form, false, Acc}
         end,
+
     {Forms2, Acc2} = pass(Forms1, Fun2, Acc1),
+
     case Acc2#pass1.generated of
         true ->
             Forms2;
@@ -122,7 +120,7 @@ do_transform(Forms, _Options) ->
                 [_|_] ->
                     [{eof,Last}|RevForms] = lists:reverse(Forms2),
                     [{function, NewLast, _, _, _}|_] = RevAs =
-                        lists:reverse(generate_accessors(Last, Acc2, Acc2#pass1.record_types)),
+                        lists:reverse(generate_accessors(Last, Acc2)),
                     lists:reverse([{eof, NewLast+1} | RevAs] ++ RevForms)
             end
     end.
@@ -132,38 +130,7 @@ pass(Forms, Fun, Acc) ->
     NewForms = [erl_syntax:revert(T) || T <- lists:flatten(NewTree)],
     {NewForms, NewAcc}.
 
-generate_accessors(L, Acc, Types) ->
-    AttrTypes = lists:map(
-                  fun({typed_record_field,
-                       {record_field, _L1, {atom, _L1, Attr}, _},
-                       {remote_type, _L1, [_M, {atom, _L1, Type}, []]}}) ->
-                          {Attr, Type};
-                     ({typed_record_field,
-                       {record_field, _L1, {atom, _L1, Attr}, _},
-                       {type, _L1, T, _Args}}) ->
-                          {Attr, T};
-                     ({typed_record_field,
-                       {record_field, _L1, {atom, _L1, Attr}},
-                       {type, _L1, union,
-                        [{atom, _L1, undefined},
-                         {remote_type, _L1,
-                          [{atom, _L1, _M}, {atom, _L1, T},[]]}]}}) ->
-                          {Attr, T};
-                     ({typed_record_field,
-                       {record_field, _L1, {atom, _L1, Attr}},
-                       {type, _L1, union,
-                        [{atom, _L1, undefined},
-                         {type, _L1, T, _Args}]}}) ->
-                          {Attr, T};
-                     ({typed_record_field,
-                       {record_field, _L1, {atom, _L1, Attr}},
-                       {type, _L1, union,
-                        [{remote_type, _L1,
-                          [{atom, _L1, _M}, {atom, _L1, T},[]]},
-                        {atom, _L1, undefined}]}}) ->
-                          {Attr, T}
-                  end, Types),
-    %io:format("AttrTypes ~p~n", [f_type_2(AttrTypes, L)]),
+generate_accessors(L, Acc) ->   
     lists:concat(lists:map(
                    fun(Rname) ->
                            Fields = get_flds(Rname, Acc),
@@ -171,7 +138,6 @@ generate_accessors(L, Acc, Types) ->
                             f_new_1(Rname, L),
                             f_get_2(Rname, Fields, L),
                             f_set_2(Rname, Fields, L),
-                            f_type_2(AttrTypes, L),
                             f_fields_0(Rname, L)]
                    end, Acc#pass1.exports)).
 
@@ -184,11 +150,6 @@ get_flds(Rname, #pass1{records = Rs}) ->
 
 %%% Accessor functions
 %%%
-f_type_2(AttrTypes, L) ->
-    {function, L, type, 1,
-      [{clause, L, [{atom, L, Attr}], [],
-        [{atom, L, Type}]} || {Attr, Type} <- AttrTypes]}.
-
 f_new_0(Rname, L) ->
     {function, L, new, 0,
      [{clause, L, [], [],
@@ -227,7 +188,7 @@ f_set_2(Rname, Flds, L) ->
                  {record, L, {var,L,'R'}, Rname,
                   [{record_field, L,
                     {atom, L, Attr},
-                    {call, L, {remote, L,{atom, L, maru_model_types}, {atom, L, convert}}, [{call, L, {atom, L, type}, [{atom, L, Attr}]}, {var, L, 'V'}]}}]},
+                    {var, L, 'V'}}]},
                  {var, L, 'F1'}]}]} || Attr <- Flds]]}}},
         {call, L, {var, L, 'F'}, [{var, L, 'Vals'},
                                   {var, L, 'Rec'},
